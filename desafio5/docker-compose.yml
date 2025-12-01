@@ -1,0 +1,71 @@
+# Docker Compose - Microsserviços com API Gateway
+# Desafio 5: Arquitetura com gateway centralizando acesso a dois microsserviços
+
+version: '3.8'
+
+services:
+  # ==================== MICROSSERVIÇO DE USUÁRIOS ====================
+  users-service:
+    build:
+      context: ./users_service
+      dockerfile: Dockerfile
+    container_name: users-service
+    ports:
+      - "5001:5001"
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ==================== MICROSSERVIÇO DE PEDIDOS ====================
+  orders-service:
+    build:
+      context: ./orders_service
+      dockerfile: Dockerfile
+    container_name: orders-service
+    ports:
+      - "5002:5002"
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5002/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ==================== API GATEWAY ====================
+  api-gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    ports:
+      - "5000:5000"
+    environment:
+      - USERS_SERVICE_URL=http://users-service:5001
+      - ORDERS_SERVICE_URL=http://orders-service:5002
+    networks:
+      - microservices-network
+    depends_on:
+      - users-service
+      - orders-service
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+# ==================== REDE ====================
+networks:
+  microservices-network:
+    driver: bridge
+    name: desafio5-network
